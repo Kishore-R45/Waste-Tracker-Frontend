@@ -19,6 +19,7 @@ function Login() {
     console.log(result);
 
     if (result.success) {
+      console.log("Navigating now...");
       navigate('/dashboard');
     }
     
