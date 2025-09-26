@@ -1,14 +1,16 @@
 import axios from 'axios';
 
-// Create Axios instance
+// Use environment variable with fallback
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL, // Your backend API base URL
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true
 });
 
-// Request interceptor: attach token if it exists
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -22,16 +24,12 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor: handle 401 (unauthorized) globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear stored credentials
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-
-      // Redirect to login page
       window.location.href = '/login';
     }
     return Promise.reject(error);
