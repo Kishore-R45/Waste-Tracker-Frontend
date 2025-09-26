@@ -1,97 +1,41 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import api from '../api/axios';
-import toast from 'react-hot-toast';
+import axios from 'axios';
 
-const AuthContext = createContext();
+// Create Axios instance
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL, // Your backend API base URL
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+// Request interceptor: attach token if it exists
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  return context;
-};
+);
 
-export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    checkAuth();
-  }, []);
-
-  const checkAuth = async () => {
-    try {
-      const response = await api.get('/api/auth/me');
-      setUser(response.data.user);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-    } catch (error) {
+// Response interceptor: handle 401 (unauthorized) globally
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear stored credentials
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      setUser(null);
-    } finally {
-      setLoading(false);
+
+      // Redirect to login page
+      window.location.href = '/login';
     }
-  };
+    return Promise.reject(error);
+  }
+);
 
-  const login = async (email, password) => {
-    try {
-      const response = await api.post('/api/auth/login', { email, password });
-      const { token, user } = response.data;
-
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-
-      setUser(user);
-      toast.success('Login successful!');
-      return { success: true };
-    } catch (error) {
-      const msg = error.response?.data?.message || 'Login failed';
-      toast.error(msg);
-      return { success: false, error: msg };
-    }
-  };
-
-  const register = async (name, email, password) => {
-    try {
-      const response = await api.post('/api/auth/register', { name, email, password });
-      const { token, user } = response.data;
-
-      localStorage.setItem('token', token);
-      localStorage.setItem('user', JSON.stringify(user));
-
-      setUser(user);
-      toast.success('Registration successful!');
-      return { success: true };
-    } catch (error) {
-      const msg = error.response?.data?.message || 'Registration failed';
-      toast.error(msg);
-      return { success: false, error: msg };
-    }
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
-    toast.success('Logged out successfully');
-  };
-
-  const value = {
-    user,
-    loading,
-    login,
-    register,
-    logout,
-    checkAuth,
-  };
-
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+export default api;
